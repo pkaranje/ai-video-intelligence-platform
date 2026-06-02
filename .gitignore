@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# uv
+.uv/
+
+# Environment files (example files are committed)
+.env
+.env.docker
+.env.local
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Data volumes
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store

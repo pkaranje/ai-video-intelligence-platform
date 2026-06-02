@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  # Services will be added in subsequent steps
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_data:
+
+networks:
+  default:
+    name: videosumm
