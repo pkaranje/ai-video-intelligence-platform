@@ -45,7 +45,7 @@ help:
 	@printf "\n$(GREEN)Code quality$(RESET)\n"
 	@printf "  lint                Ruff check + format check (all Python services)\n"
 	@printf "  lint-fix            Ruff check + format with auto-fix\n"
-	@printf "  test                Run test suite (api service)\n"
+	@printf "  test                Run all tests (unit + integration)\n"
 	@printf "\n$(GREEN)Docker — full stack$(RESET)\n"
 	@printf "  build               Build all images (uses cache)\n"
 	@printf "  build-no-cache      Build all images (no cache)\n"
@@ -129,7 +129,11 @@ lint-fix:
 	@printf "$(GREEN)✓ Lint fixed$(RESET)\n"
 
 test:
+	@printf "$(CYAN)Running all tests...$(RESET)\n"
 	@$(MAKE) -C services/api test
+	@$(MAKE) -C services/extractor test
+	@$(MAKE) -C services/worker test
+	@printf "$(GREEN)✓ All tests passed$(RESET)\n"
 
 # ==============================================================================
 #  DOCKER — BUILD
@@ -151,7 +155,7 @@ up: env-check
 	@printf "$(CYAN)Starting all services...$(RESET)\n"
 	$(COMPOSE) up -d --build
 	@printf "$(GREEN)✓ All services started$(RESET)\n"
-	@printf "  API      → http://localhost:8000/api/v1/health\n"
+	@printf "  API      → http://localhost:8000/health\n"
 	@printf "  UI       → http://localhost:3000\n"
 	@printf "  Docs     → http://localhost:8000/docs\n"
 	@printf "  DevTrack → http://localhost:8000/__devtrack__/dashboard\n"
@@ -163,7 +167,7 @@ up-api: env-check
 	@printf "$(CYAN)Starting api stack...$(RESET)\n"
 	$(COMPOSE) up -d --build postgres redis api
 	@printf "$(GREEN)✓ Started: postgres, redis, api$(RESET)\n"
-	@printf "  API      → http://localhost:8000/api/v1/health\n"
+	@printf "  API      → http://localhost:8000/health\n"
 	@printf "  Docs     → http://localhost:8000/docs\n"
 	@printf "  DevTrack → http://localhost:8000/__devtrack__/dashboard\n"
 
@@ -184,7 +188,7 @@ up-workers: env-check
 	@printf "$(CYAN)Starting full stack...$(RESET)\n"
 	$(COMPOSE) up -d --build
 	@printf "$(GREEN)✓ Full stack started (10 services)$(RESET)\n"
-	@printf "  API      → http://localhost:8000/api/v1/health\n"
+	@printf "  API      → http://localhost:8000/health\n"
 	@printf "  UI       → http://localhost:3000\n"
 	@printf "  DevTrack → http://localhost:8000/__devtrack__/dashboard\n"
 

@@ -30,9 +30,11 @@ lint-fix:
 	ruff check --fix shared/
 
 clean:
+	@printf "$(CYAN)Cleaning libs/shared artefacts...$(RESET)\n"
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 	rm -rf .ruff_cache/ build/ dist/ *.egg-info/ 2>/dev/null || true
+	@printf "$(GREEN)✓ Clean complete$(RESET)\n"
 
 clean-all: clean
 	rm -rf .venv/

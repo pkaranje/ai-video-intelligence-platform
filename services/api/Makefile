@@ -16,13 +16,13 @@ lint-fix:
 	uv run ruff format api/
 
 test:
-	uv run pytest ../../tests/ -v
+	uv run pytest tests/ -v
 
 test-unit:
-	uv run pytest ../../tests/unit/ -v
+	uv run pytest tests/unit/ -v
 
 test-integration:
-	uv run pytest ../../tests/integration/ -v
+	uv run pytest tests/integration/ -v
 
 db-migrate:
 	uv run alembic upgrade head
@@ -46,9 +46,11 @@ shell-redis:
 	docker compose -f ../../docker-compose.yml exec redis redis-cli
 
 clean:
+	@printf "$(CYAN)Cleaning API artefacts...$(RESET)\n"
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .ruff_cache -exec rm -rf {} + 2>/dev/null || true
+	@printf "$(GREEN)✓ Clean complete$(RESET)\n"
 
 clean-all: clean
 	rm -rf .venv
