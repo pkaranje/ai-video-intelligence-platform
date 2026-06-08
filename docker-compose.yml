@@ -1,0 +1,61 @@
+networks:
+  ai-video-intelligence:
+    driver: bridge
+    name: ai-video-intelligence
+
+volumes:
+  ai-video-intelligence-postgres-data:
+    name: ai-video-intelligence-postgres-data
+  ai-video-intelligence-redis-data:
+    name: ai-video-intelligence-redis-data
+  ai-video-intelligence-app-data:
+    name: ai-video-intelligence-app-data
+
+services:
+  postgres:
+    container_name: ai-video-intelligence-postgres
+    image: postgres:16-alpine
+    volumes:
+      - ai-video-intelligence-postgres-data:/var/lib/postgresql/data
+    env_file:
+      - .env.docker.db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-video-intelligence
+
+  redis:
+    container_name: ai-video-intelligence-redis
+    image: redis:7-alpine
+    volumes:
+      - ai-video-intelligence-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-video-intelligence
+
+  api:
+    container_name: ai-video-intelligence-api
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.docker.db
+      - .env.docker.api
+    volumes:
+      - ai-video-intelligence-app-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-video-intelligence

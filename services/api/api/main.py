@@ -34,15 +34,15 @@ def create_app() -> FastAPI:
 
     app.include_router(devtrack_router)
     app.include_router(health.router)
-    app.include_router(videos.router, prefix="/api")
-    app.include_router(status.router, prefix="/api")
-    app.include_router(summary.router, prefix="/api")
-    app.include_router(timeline.router, prefix="/api")
-    app.include_router(frames.router, prefix="/api")
+    app.include_router(videos.router, prefix="/api/v1")
+    app.include_router(status.router, prefix="/api/v1")
+    app.include_router(summary.router, prefix="/api/v1")
+    app.include_router(timeline.router, prefix="/api/v1")
+    app.include_router(frames.router, prefix="/api/v1")
 
     app.add_middleware(
         DevTrackMiddleware,
-        exclude_path=["/healthz", "/docs", "/redoc", "/openapi.json"],
+        exclude_path=["/docs", "/redoc", "/openapi.json"],
     )
     app.add_middleware(RequestLoggingMiddleware)
 
