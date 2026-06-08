@@ -1,0 +1,109 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python version managers
+.python-version
+
+# uv
+.uv/
+# uv.lock — committed for reproducible installs
+
+# Environment files
+.env
+.env.local
+.env.docker
+.env.dev
+.env.test
+.env.staging
+.env.prod
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+*.cover
+
+# Alembic
+migrations/versions/*.pyc
+
+# Code quality
+.mypy_cache/
+.ruff_cache/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Cursor
+.cursor/
+.cursorignore
+.cursorcontext
+
+# Windsurf — .windsurfrules is committed (project instructions)
+.windsurf/
+
+# Zed
+.zed/
+
+# OpenSpec
+.openspec/
+
+# Codex
+.codex/
+
+# Claude Code — settings.local.json is personal, settings.json is committed
+.claude/settings.local.json
+
+# Copilot — copilot-instructions.md is committed (project instructions)
+
+# OS
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Databases
+*.db
+*.sqlite3
+
+# Data — protected, never delete or commit
+data/chroma_db/
+data/raw/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Devbox
+.devbox/
+
+# Docker
+docker-compose.override.yml
+
+# Prompts — PROMPTS.md committed, PROMPTS.local.md is personal
+PROMPTS.local.md
