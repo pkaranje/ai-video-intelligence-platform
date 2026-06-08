@@ -18,8 +18,29 @@ class UnsupportedFormatError(ValueError):
     pass
 
 
-def validate_upload(filename: str, content_type: str, size_bytes: int) -> None:
+class DurationExceededError(ValueError):
+    pass
+
+
+class JobNotFoundError(LookupError):
+    pass
+
+
+class SummaryNotReadyError(LookupError):
+    pass
+
+
+def validate_upload(
+    filename: str,
+    content_type: str,
+    size_bytes: int,
+    max_file_size_mb: int = MAX_FILE_SIZE_MB,
+) -> None:
     if content_type != "video/mp4":
-        raise UnsupportedFormatError(f"Unsupported format: {content_type!r}. Only video/mp4 is accepted.")
-    if size_bytes > MAX_FILE_SIZE_MB * 1024 * 1024:
-        raise UploadTooLargeError(f"File size {size_bytes} bytes exceeds limit of {MAX_FILE_SIZE_MB} MB.")
+        raise UnsupportedFormatError(
+            f"Unsupported format: {content_type!r}. Only video/mp4 is accepted."
+        )
+    if size_bytes > max_file_size_mb * 1024 * 1024:
+        raise UploadTooLargeError(
+            f"File size {size_bytes} bytes exceeds limit of {max_file_size_mb} MB."
+        )

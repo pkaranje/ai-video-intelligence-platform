@@ -33,7 +33,9 @@ def configure_logging() -> None:
             while frame.f_code.co_filename == logging.__file__:
                 frame = frame.f_back  # type: ignore[assignment]
                 depth += 1
-            logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+            logger.opt(depth=depth, exception=record.exc_info).log(
+                level, record.getMessage()
+            )
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
@@ -52,10 +54,19 @@ def log_call(func: Callable) -> Callable:
         start = time.monotonic()
         try:
             result = await func(*args, **kwargs)
-            log.info("call_end", func=func.__name__, elapsed_ms=round((time.monotonic() - start) * 1000, 2))
+            log.info(
+                "call_end",
+                func=func.__name__,
+                elapsed_ms=round((time.monotonic() - start) * 1000, 2),
+            )
             return result
         except Exception as exc:
-            log.error("call_error", func=func.__name__, elapsed_ms=round((time.monotonic() - start) * 1000, 2), error=str(exc))
+            log.error(
+                "call_error",
+                func=func.__name__,
+                elapsed_ms=round((time.monotonic() - start) * 1000, 2),
+                error=str(exc),
+            )
             raise
 
     @functools.wraps(func)
@@ -65,13 +76,23 @@ def log_call(func: Callable) -> Callable:
         start = time.monotonic()
         try:
             result = func(*args, **kwargs)
-            log.info("call_end", func=func.__name__, elapsed_ms=round((time.monotonic() - start) * 1000, 2))
+            log.info(
+                "call_end",
+                func=func.__name__,
+                elapsed_ms=round((time.monotonic() - start) * 1000, 2),
+            )
             return result
         except Exception as exc:
-            log.error("call_error", func=func.__name__, elapsed_ms=round((time.monotonic() - start) * 1000, 2), error=str(exc))
+            log.error(
+                "call_error",
+                func=func.__name__,
+                elapsed_ms=round((time.monotonic() - start) * 1000, 2),
+                error=str(exc),
+            )
             raise
 
     import asyncio
+
     if asyncio.iscoroutinefunction(func):
         return async_wrapper
     return sync_wrapper
