@@ -31,3 +31,11 @@ class StatusResponse(BaseModel):
     stage: ProgressStage | None = None
     progress_pct: int
     error_message: str | None = None
+
+
+class FrameMetadataResponse(BaseModel):
+    id: UUID
+    timestamp: float
+    frame_number: int
+    selection_reason: str
+    scene_score: float | None = None
