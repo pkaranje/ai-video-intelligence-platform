@@ -46,7 +46,7 @@ Single-server Docker Compose deployment. 4 vCPU, 8 GB RAM.
 │   ├── package.json
 │   ├── Makefile
 │   └── Dockerfile
-├── tests/                    # Integration + unit tests (repo root)
+├── services/api/tests/       # All api tests (unit + integration)
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml
@@ -54,8 +54,13 @@ Single-server Docker Compose deployment. 4 vCPU, 8 GB RAM.
 ├── docker-compose.yml
 ├── Makefile                  # Root — delegates to service Makefiles
 ├── pyproject.toml            # Tooling config only (ruff + pytest)
+├── scripts/
+│   └── ollama-entrypoint.sh  # Auto-pulls OLLAMA_MODEL on first container start
 ├── .env.example
-├── .env.docker.example
+├── .env.docker.db.example
+├── .env.docker.api.example
+├── .env.docker.extractor.example
+├── .env.docker.worker.example
 └── .gitignore
 ```
 
@@ -97,6 +102,45 @@ dependencies = [
 | `services/extractor/` | Yes | `messages.py` + `middleware.py` |
 | `services/worker/` | Yes | `messages.py` + `middleware.py` |
 | `frontend/` | No | — |
+
+---
+
+## Test structure
+
+Each service owns its tests completely. No shared test directory at repo root.
+
+```
+services/api/tests/
+├── __init__.py
+├── unit/
+│   ├── test_domain_video.py      # validate_upload() all error paths
+│   ├── test_domain_frame.py      # validate_frame_metadata() missing keys
+│   └── test_domain_summary.py    # validate_aggregation_json() valid + malformed
+└── integration/
+    ├── conftest.py               # test DB, test Redis, mock AIClient fixtures
+    ├── test_upload_pipeline.py
+    ├── test_extraction_pipeline.py
+    ├── test_analysis_pipeline.py
+    ├── test_aggregation_pipeline.py
+    └── test_cleanup_pipeline.py
+
+services/extractor/tests/
+└── unit/
+    └── test_domain_frame.py      # FrameMetadata, SelectionReason (Step 16)
+
+services/worker/tests/
+└── unit/
+    ├── test_domain_analysis.py   # validate_analysis() (Step 19)
+    └── test_domain_summary.py    # validate_aggregation_json() (Step 19)
+```
+
+| Test type | Location | Requires |
+|---|---|---|
+| Unit (domain, pure functions) | `services/<name>/tests/unit/` | Nothing — pure Python |
+| Integration (full pipeline) | `services/api/tests/integration/` | DB + Redis + FFmpeg |
+
+`make test` at root delegates to each service's `make test`.
+Integration tests are driven through the API — it is the pipeline entry point.
 
 ---
 
@@ -193,6 +237,19 @@ services/api/
 ├── Dockerfile
 ├── .gitignore
 ├── alembic.ini
+├── tests/
+│   ├── __init__.py
+│   ├── unit/
+│   │   ├── test_domain_video.py
+│   │   ├── test_domain_frame.py
+│   │   └── test_domain_summary.py
+│   └── integration/
+│       ├── conftest.py
+│       ├── test_upload_pipeline.py
+│       ├── test_extraction_pipeline.py
+│       ├── test_analysis_pipeline.py
+│       ├── test_aggregation_pipeline.py
+│       └── test_cleanup_pipeline.py
 ├── alembic/
 │   ├── env.py
 │   └── versions/
@@ -240,15 +297,26 @@ Note: `routes/` lives inside `api/` not in a separate `api/` directory:
 api/
 └── routes/
     ├── __init__.py
-    ├── videos.py    # POST /api/videos
-    ├── status.py    # GET  /api/videos/{job_id}/status
-    ├── summary.py   # GET  /api/videos/{job_id}/summary
-    ├── timeline.py  # GET  /api/videos/{job_id}/timeline
-    ├── frames.py    # GET  /api/videos/{job_id}/frames
-    └── health.py    # GET  /healthz
+    ├── videos.py    # POST /api/v1/videos
+    ├── status.py    # GET  /api/v1/videos/{job_id}/status
+    ├── summary.py   # GET  /api/v1/videos/{job_id}/summary
+    ├── timeline.py  # GET  /api/v1/videos/{job_id}/timeline
+    ├── frames.py    # GET  /api/v1/videos/{job_id}/frames
+    └── health.py    # GET  /health
 ```
 
 **Entry point:** `uvicorn api.main:app`
+
+### app factory (main.py)
+
+```python
+# prefix: /api/v1 on all routes
+# devtrack_router included (no prefix — devtrack owns its own paths)
+# dashboard: http://localhost:8000/__devtrack__/dashboard
+# DevTrackMiddleware registered before RequestLoggingMiddleware
+# exclude_path: ["/api/v1/docs", "/api/v1/redoc", "/api/v1/openapi.json"]
+# lifespan: DB engine + Redis init/teardown, configure_logging() on startup
+```
 
 ---
 
@@ -260,6 +328,9 @@ services/extractor/
 ├── Makefile
 ├── Dockerfile
 ├── .gitignore
+├── tests/
+│   └── unit/
+│       └── test_domain_frame.py
 └── extractor/
     ├── __init__.py
     ├── main.py             # Dramatiq entry, ActorMetricsMiddleware registration
@@ -304,6 +375,10 @@ services/worker/
 ├── Makefile
 ├── Dockerfile
 ├── .gitignore
+├── tests/
+│   └── unit/
+│       ├── test_domain_analysis.py
+│       └── test_domain_summary.py
 └── worker/
     ├── __init__.py
     ├── main.py             # Dramatiq entry, ActorMetricsMiddleware registration
@@ -449,6 +524,104 @@ POST /api/videos
 
 ---
 
+## AI provider configuration
+
+The worker `AIClient` supports three providers via the OpenAI-compatible API.
+Switch providers by changing env vars only — zero code changes required.
+
+### OpenAI (default — production)
+```bash
+AI_MODEL=gpt-4o
+AGGREGATION_MODEL=gpt-4o
+AI_BASE_URL=                         # empty = uses OpenAI default
+OPENAI_API_KEY=sk-...
+```
+
+### Gemini Flash 2.0 (production — cost-efficient)
+```bash
+AI_MODEL=gemini-2.0-flash
+AGGREGATION_MODEL=gemini-2.0-flash
+AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+OPENAI_API_KEY=your_google_api_key   # Google AI Studio key
+```
+
+### Ollama — local (development / testing)
+
+**Fixed model: `qwen2.5vl:3b`** — only local model supported.
+Chosen because it fits in 8GB RAM alongside Docker services.
+`qwen2.5vl:7b` will cause swapping on 8GB machines — do not use.
+
+```bash
+AI_MODEL=qwen2.5vl:3b
+AGGREGATION_MODEL=qwen2.5vl:3b
+AI_BASE_URL=http://ai-video-intelligence-ollama:11434/v1
+OPENAI_API_KEY=ollama                # Ollama ignores this — required by SDK
+OLLAMA_MODEL=qwen2.5vl:3b           # used by entrypoint script to auto-pull
+```
+
+Workers connect to Ollama via Docker service name — not `host.docker.internal`.
+Model is pulled automatically on first start via `scripts/ollama-entrypoint.sh`.
+
+### Ollama Docker setup
+
+```bash
+# Start with Ollama (first run downloads model — allow 2-5 min)
+make up-ollama
+
+# Check model is ready
+make ollama-list
+
+# Pull a different model manually if needed
+make ollama-pull MODEL=qwen2.5vl:3b
+```
+
+### 8GB RAM guidance
+
+On an 8GB machine, run only 1 worker with Ollama:
+```bash
+# Start subset only — not make up-workers (which starts 4 workers)
+docker compose up -d postgres redis api ffmpeg-extractor worker-1 ollama scheduler
+```
+
+RAM budget on 8GB:
+```
+macOS + Docker Desktop   ~3GB
+postgres + redis + api   ~1GB
+ffmpeg-extractor         ~512MB
+worker-1 (×1 only)      ~512MB
+ollama + qwen2.5vl:3b   ~2.5GB
+─────────────────────────────
+Total                    ~7.5GB  ← fits with headroom
+```
+
+### Calling strategy per provider
+
+| Provider | Strategy | Reason |
+|---|---|---|
+| OpenAI / Gemini | Batch — all frames in one call | Large context, fast |
+| Ollama | Sequential — one frame per call | Limited context, OOM risk |
+
+`AIClient` detects provider automatically via `AI_BASE_URL`:
+```python
+self.is_ollama = "11434" in (settings.AI_BASE_URL or "")
+```
+
+### Frame format
+All providers receive frames as base64-encoded JPEG data URLs:
+```
+data:image/jpeg;base64,{base64_data}
+```
+Compatible with GPT-4o, Gemini Flash, qwen2.5vl:3b — no code changes needed.
+
+### Recommended settings for 30–60 second videos
+```bash
+FRAME_INTERVAL=60        # ~1 frame per 2sec at 30fps
+SCENE_THRESHOLD=0.3      # slightly more sensitive
+BATCH_SIZE=15            # all frames in one batch
+```
+
+---
+
 ## Queue names
 
 | Queue | Producer | Consumer | Payload |
@@ -498,28 +671,35 @@ Failed jobs use `FAILED_JOB_TTL_DAYS` (default 1).
 
 ## Environment variables
 
-| Variable | Default | Owner |
-|---|---|---|
-| `DATABASE_URL` | — | api, extractor, worker |
-| `REDIS_URL` | — | api, extractor, worker |
-| `OPENAI_API_KEY` | — | worker |
-| `AI_MODEL` | `gpt-4o` | worker |
-| `AI_BASE_URL` | — | worker |
-| `AGGREGATION_MODEL` | `gpt-4o` | worker |
-| `MAX_RETRIES` | `3` | worker |
-| `MIN_BACKOFF_SEC` | `15` | worker |
-| `MAX_BACKOFF_SEC` | `120` | worker |
-| `SCENE_THRESHOLD` | `0.35` | extractor |
-| `FRAME_INTERVAL` | `150` | extractor |
-| `BATCH_SIZE` | `5` | extractor, worker |
-| `MAX_FILE_SIZE_MB` | `500` | api |
-| `MAX_DURATION_SEC` | `600` | api, extractor |
-| `DATA_ROOT` | `/data` | api, extractor, worker |
-| `JOB_TTL_DAYS` | `7` | worker |
-| `FAILED_JOB_TTL_DAYS` | `1` | worker |
-| `CLEANUP_CRON` | `0 2 * * *` | worker |
-| `BACKEND_URL` | `http://api:8000` | frontend (server-side only) |
-| `NEXT_PUBLIC_API_URL` | `/api/proxy` | frontend (client-side) |
+| Variable | Default | Owner | env file |
+|---|---|---|---|
+| `POSTGRES_DB` | `videosumm` | postgres | `.env.docker.db` |
+| `POSTGRES_USER` | `postgres` | postgres | `.env.docker.db` |
+| `POSTGRES_PASSWORD` | — | postgres | `.env.docker.db` |
+| `DATABASE_URL` | — | api, extractor, worker | `.env.docker.db` |
+| `REDIS_URL` | — | api, extractor, worker | `.env.docker.db` |
+| `OPENAI_API_KEY` | — | worker | `.env.docker.worker` |
+| `AI_MODEL` | `gpt-4o` | worker | `.env.docker.worker` |
+| `AI_BASE_URL` | — | worker | `.env.docker.worker` |
+| `AGGREGATION_MODEL` | `gpt-4o` | worker | `.env.docker.worker` |
+| `AI_PROVIDER` | `openai` | worker | `.env.docker.worker` |
+| `OLLAMA_MODEL` | `qwen2.5vl:3b` | ollama | `environment:` block |
+| `MAX_RETRIES` | `3` | worker | `.env.docker.worker` |
+| `MIN_BACKOFF_SEC` | `15` | worker | `.env.docker.worker` |
+| `MAX_BACKOFF_SEC` | `120` | worker | `.env.docker.worker` |
+| `JOB_TTL_DAYS` | `7` | worker | `.env.docker.worker` |
+| `FAILED_JOB_TTL_DAYS` | `1` | worker | `.env.docker.worker` |
+| `CLEANUP_CRON` | `0 2 * * *` | worker | `.env.docker.worker` |
+| `SCENE_THRESHOLD` | `0.35` | extractor | `.env.docker.extractor` |
+| `FRAME_INTERVAL` | `150` | extractor | `.env.docker.extractor` |
+| `FFMPEG_BIN` | `ffmpeg` | extractor | `.env.docker.extractor` |
+| `FFPROBE_BIN` | `ffprobe` | extractor | `.env.docker.extractor` |
+| `BATCH_SIZE` | `5` | extractor, worker | `.env.docker.extractor` / `.env.docker.worker` |
+| `MAX_FILE_SIZE_MB` | `500` | api | `.env.docker.api` |
+| `MAX_DURATION_SEC` | `600` | api, extractor | `.env.docker.api` / `.env.docker.extractor` |
+| `DATA_ROOT` | `/data` | api, extractor, worker | `.env.docker.api` / `.env.docker.extractor` / `.env.docker.worker` |
+| `BACKEND_URL` | `http://ai-video-intelligence-api:8000` | frontend | `environment:` block |
+| `NEXT_PUBLIC_API_URL` | `/api/proxy` | frontend | `environment:` block |
 
 ---
 
@@ -527,12 +707,12 @@ Failed jobs use `FAILED_JOB_TTL_DAYS` (default 1).
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| POST | `/api/videos` | 202 | `multipart/form-data`, field=`file` |
-| GET | `/api/videos/{job_id}/status` | 200 | stage, progress_pct, error_message |
-| GET | `/api/videos/{job_id}/summary` | 200 | 404 if not completed |
-| GET | `/api/videos/{job_id}/timeline` | 200 | 404 if not completed |
-| GET | `/api/videos/{job_id}/frames` | 200 | frame metadata list |
-| GET | `/healthz` | 200 | `{"status":"ok"}` |
+| POST | `/api/v1/videos` | 202 | `multipart/form-data`, field=`file` |
+| GET | `/api/v1/videos/{job_id}/status` | 200 | stage, progress_pct, error_message |
+| GET | `/api/v1/videos/{job_id}/summary` | 200 | 404 if not completed |
+| GET | `/api/v1/videos/{job_id}/timeline` | 200 | 404 if not completed |
+| GET | `/api/v1/videos/{job_id}/frames` | 200 | frame metadata list |
+| GET | `/health` | 200 | `{"status":"ok"}` |
 
 Upload errors: `415` wrong MIME · `413` too large · `422` duration exceeded
 
@@ -540,17 +720,42 @@ Upload errors: `415` wrong MIME · `413` too large · `422` duration exceeded
 
 ## Docker Compose services
 
-| Service | Build context | Est. RAM |
-|---|---|---|
-| `postgres` | postgres:16-alpine | 512 MB |
-| `redis` | redis:7-alpine | 256 MB |
-| `api` | `.` dockerfile: `services/api/Dockerfile` | 512 MB |
-| `frontend` | `./frontend` | 256 MB |
-| `ffmpeg-extractor` | `.` dockerfile: `services/extractor/Dockerfile` | 1.5 GB peak |
-| `worker-1..4` | `.` dockerfile: `services/worker/Dockerfile` | 512 MB ×4 |
-| `scheduler` | `.` dockerfile: `services/worker/Dockerfile` | ~50 MB |
+| Container | Service key | Build context | Est. RAM |
+|---|---|---|---|
+| `ai-video-intelligence-postgres` | `postgres` | postgres:16-alpine | 512 MB |
+| `ai-video-intelligence-redis` | `redis` | redis:7-alpine | 256 MB |
+| `ai-video-intelligence-api` | `api` | `.` dockerfile: `services/api/Dockerfile` | 512 MB |
+| `ai-video-intelligence-frontend` | `frontend` | `./frontend` | 256 MB |
+| `ai-video-intelligence-extractor` | `ffmpeg-extractor` | `.` dockerfile: `services/extractor/Dockerfile` | 1.5 GB peak |
+| `ai-video-intelligence-worker-1..4` | `worker-1..4` | `.` dockerfile: `services/worker/Dockerfile` | 512 MB ×4 |
+| `ai-video-intelligence-scheduler` | `scheduler` | `.` dockerfile: `services/worker/Dockerfile` | ~50 MB |
+| `ai-video-intelligence-ollama` | `ollama` | ollama/ollama (optional) | 2.5–5 GB |
 
+All services join the `ai-video-intelligence` bridge network.
 All Python services use repo root as build context so `libs/shared/` is accessible.
+
+### Ollama service (optional — local dev only)
+
+Included in docker-compose.yml but only started when explicitly requested.
+Workers depend on `ollama: condition: service_healthy` when Ollama is enabled.
+Model is pulled automatically on first start via `scripts/ollama-entrypoint.sh`.
+Model data persists in `ai-video-intelligence-ollama-data` volume — survives restarts.
+
+### env_file per service
+
+| Service | env files loaded |
+|---|---|
+| `postgres` | `.env.docker.db` |
+| `redis` | — |
+| `api` | `.env.docker.db` · `.env.docker.api` |
+| `ffmpeg-extractor` | `.env.docker.db` · `.env.docker.extractor` |
+| `worker-1..4` | `.env.docker.db` · `.env.docker.worker` |
+| `scheduler` | `.env.docker.db` · `.env.docker.worker` |
+| `frontend` | `environment:` block only (NEXT_PUBLIC_API_URL, BACKEND_URL) |
+| `ollama` | `environment:` block only (OLLAMA_MODEL) |
+
+Each service sees only the variables it needs.
+`.env.docker.*` files are gitignored. `.env.docker.*.example` files are committed.
 
 ---
 
@@ -559,11 +764,15 @@ All Python services use repo root as build context so `libs/shared/` is accessib
 ```
 Makefile                      ← root: delegates via $(MAKE) -C
 libs/shared/Makefile          ← install, lint, lint-fix, clean
-services/api/Makefile         ← install, lint, test, db-*, shell, shell-db
+services/api/Makefile         ← install, lint, test-unit, test-integration,
+                                 db-*, shell, shell-db
 services/extractor/Makefile   ← install, lint, shell, logs
 services/worker/Makefile      ← install, lint, shell-1..4, logs, trigger-cleanup
 frontend/Makefile             ← install, dev, build, typecheck, lint, shell
 ```
+
+Root `make test` loops across all services calling `make test` in each.
+Each service runs its own unit tests. API service also runs integration tests.
 
 Root install order: `shared → api → extractor → worker → frontend`
 

@@ -27,7 +27,12 @@ def set_session_factory(factory: async_sessionmaker[AsyncSession]) -> None:
 
 @dramatiq.actor(queue_name="extraction", max_retries=3)
 def extraction_task(job_id: str) -> None:
-    asyncio.run(_run_extraction(job_id))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run_extraction(job_id))
+    finally:
+        loop.close()
 
 
 async def _run_extraction(job_id: str) -> None:

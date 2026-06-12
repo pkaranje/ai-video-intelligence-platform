@@ -8,8 +8,6 @@ volumes:
     name: ai-video-intelligence-postgres-data
   ai-video-intelligence-redis-data:
     name: ai-video-intelligence-redis-data
-  ai-video-intelligence-app-data:
-    name: ai-video-intelligence-app-data
 
 services:
   postgres:
@@ -59,7 +57,7 @@ services:
       - .env.docker.db
       - .env.docker.api
     volumes:
-      - ai-video-intelligence-app-data:/data
+      - ./data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,6 +76,25 @@ services:
       timeout: 2s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ai-video-intelligence
+
+  ffmpeg-extractor:
+    container_name: ai-video-intelligence-extractor
+    build:
+      context: .
+      dockerfile: services/extractor/Dockerfile
+    env_file:
+      - .env.docker.db
+      - .env.docker.extractor
+    volumes:
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - ai-video-intelligence
