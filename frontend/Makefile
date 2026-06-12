@@ -13,10 +13,10 @@ typecheck:
 	npx tsc --noEmit
 
 lint:
-	npx next lint
+	npx eslint .
 
 lint-fix:
-	npx next lint --fix
+	npx eslint . --fix
 
 shell:
 	docker exec -it ai-video-intelligence-frontend sh
