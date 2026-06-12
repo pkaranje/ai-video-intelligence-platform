@@ -2,27 +2,44 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 
-async function proxy(req: NextRequest, params: Promise<{ path: string[] }>) {
+const HOP_BY_HOP = new Set([
+  "connection",
+  "host",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailers",
+  "transfer-encoding",
+  "upgrade",
+]);
+
+async function proxy(
+  req: NextRequest,
+  params: Promise<{ path: string[] }>
+): Promise<NextResponse> {
   const { path } = await params;
   const upstream = `${BACKEND_URL}/${path.join("/")}${req.nextUrl.search}`;
 
-  const headers = new Headers();
+  const reqHeaders = new Headers();
   req.headers.forEach((value, key) => {
-    if (!["host", "connection"].includes(key.toLowerCase())) {
-      headers.set(key, value);
+    if (!HOP_BY_HOP.has(key.toLowerCase())) {
+      reqHeaders.set(key, value);
     }
   });
 
-  const init: RequestInit = { method: req.method, headers };
-  if (!["GET", "HEAD"].includes(req.method)) {
-    init.body = req.body;
-    (init as RequestInit & { duplex: string }).duplex = "half";
-  }
+  const hasBody = !["GET", "HEAD"].includes(req.method);
+  const init: RequestInit & { duplex?: string } = {
+    method: req.method,
+    headers: reqHeaders,
+    ...(hasBody && { body: req.body, duplex: "half" }),
+  };
 
   const upstreamRes = await fetch(upstream, init);
+
   const resHeaders = new Headers();
   upstreamRes.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== "transfer-encoding") {
+    if (!HOP_BY_HOP.has(key.toLowerCase())) {
       resHeaders.set(key, value);
     }
   });
@@ -33,22 +50,37 @@ async function proxy(req: NextRequest, params: Promise<{ path: string[] }>) {
   });
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
   return proxy(req, params);
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
   return proxy(req, params);
 }
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
   return proxy(req, params);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
   return proxy(req, params);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
   return proxy(req, params);
 }
