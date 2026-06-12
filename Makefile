@@ -116,23 +116,23 @@ lint:
 	@printf "$(CYAN)Linting all services...$(RESET)\n"
 	@$(MAKE) -C libs/shared lint
 	@$(MAKE) -C services/api lint
-	@$(MAKE) -C services/extractor lint
-	@$(MAKE) -C services/worker lint
+	@[ ! -d services/extractor ] || $(MAKE) -C services/extractor lint
+	@[ ! -d services/worker ]    || $(MAKE) -C services/worker lint
 	@printf "$(GREEN)✓ Lint passed$(RESET)\n"
 
 lint-fix:
 	@printf "$(CYAN)Fixing lint issues...$(RESET)\n"
-	@$(MAKE) -C libs/shared lint-fix
-	@$(MAKE) -C services/api lint-fix
-	@$(MAKE) -C services/extractor lint-fix
-	@$(MAKE) -C services/worker lint-fix
+	@[ ! -d libs/shared ] || @$(MAKE) -C libs/shared lint-fix
+	@[ ! -d services/api ] || @$(MAKE) -C services/api lint-fix
+	@[ ! -d services/extractor ] || $(MAKE) -C services/extractor lint-fix
+	@[ ! -d services/worker ]    || $(MAKE) -C services/worker lint-fix
 	@printf "$(GREEN)✓ Lint fixed$(RESET)\n"
 
 test:
 	@printf "$(CYAN)Running all tests...$(RESET)\n"
-	@$(MAKE) -C services/api test
-	@$(MAKE) -C services/extractor test
-	@$(MAKE) -C services/worker test
+	@[ ! -d services/api ] || @$(MAKE) -C services/api test
+	@[ ! -d services/extractor ] || $(MAKE) -C services/extractor test
+	@[ ! -d services/worker ]    || $(MAKE) -C services/worker test
 	@printf "$(GREEN)✓ All tests passed$(RESET)\n"
 
 # ==============================================================================
@@ -234,11 +234,11 @@ db-reset:
 # ==============================================================================
 clean:
 	@printf "$(CYAN)Cleaning build artefacts...$(RESET)\n"
-	@$(MAKE) -C libs/shared clean
-	@$(MAKE) -C services/api clean
-	@$(MAKE) -C services/extractor clean
-	@$(MAKE) -C services/worker clean
-	@$(MAKE) -C frontend clean
+	@[ ! -d libs/shared ] || @$(MAKE) -C libs/shared clean
+	@[ ! -d services/api ] || @$(MAKE) -C services/api clean
+	@[ ! -d services/extractor ] || $(MAKE) -C services/extractor clean
+	@[ ! -d services/worker ]    || $(MAKE) -C services/worker clean
+	@[ ! -d frontend ] || @$(MAKE) -C frontend clean
 	@printf "$(GREEN)✓ Clean complete$(RESET)\n"
 
 clean-all: clean

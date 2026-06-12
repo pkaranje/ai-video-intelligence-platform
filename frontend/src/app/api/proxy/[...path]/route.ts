@@ -12,6 +12,7 @@ const HOP_BY_HOP = new Set([
   "trailers",
   "transfer-encoding",
   "upgrade",
+  "expect",
 ]);
 
 async function proxy(
