@@ -19,11 +19,15 @@ services:
       - ai-video-intelligence-postgres-data:/var/lib/postgresql/data
     env_file:
       - .env.docker.db
+    ports:
+      - "5433:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-videosumm}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 5s
+    restart: unless-stopped
     networks:
       - ai-video-intelligence
 
@@ -32,11 +36,15 @@ services:
     image: redis:7-alpine
     volumes:
       - ai-video-intelligence-redis-data:/data
+    ports:
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 5s
+    restart: unless-stopped
     networks:
       - ai-video-intelligence
 
@@ -57,5 +65,41 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Running migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting server...' &&
+        uvicorn api.main:app --host 0.0.0.0 --port 8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ai-video-intelligence
+
+  frontend:
+    container_name: ai-video-intelligence-frontend
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: /api/proxy
+      BACKEND_URL: http://ai-video-intelligence-api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
     networks:
       - ai-video-intelligence
